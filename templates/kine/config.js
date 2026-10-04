@@ -65,6 +65,7 @@ window.SITE = {
   // Contact
   phone: "",                      // affichage, ex. "05 22 00 00 00"
   whatsapp: "",                   // format international sans + ni espaces, ex. "212600000000"
+  whatsappDisplay: "",            // affichage optionnel, ex. "06 00 00 00 00"
   whatsappMessage: "Bonjour, je souhaite prendre rendez-vous.",
   instagram: "",
   googleRating: { score: "", url: "" } // ex. score "4,8"

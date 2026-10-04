@@ -244,7 +244,7 @@
   contacts.push(el("li", null, [el("span", { class: "label", text: "Téléphone" }),
     filled(S.phone) ? el("a", { href: "tel:" + String(S.phone).replace(/[^\d+]/g, ""), text: S.phone }) : ph("numéro de téléphone ici")]));
   contacts.push(el("li", null, [el("span", { class: "label", text: "WhatsApp" }),
-    filled(S.whatsapp) ? el("a", { href: waLink(), target: "_blank", rel: "noopener", text: "+" + String(S.whatsapp).replace(/\D/g, "") }) : ph("numéro WhatsApp ici")]));
+    filled(S.whatsapp) ? el("a", { href: waLink(), target: "_blank", rel: "noopener", text: S.whatsappDisplay || "+" + String(S.whatsapp).replace(/\D/g, "") }) : ph("numéro WhatsApp ici")]));
   if (filled(S.instagram)) {
     var handle = String(S.instagram).replace(/\/+$/, "").split("/").pop();
     contacts.push(el("li", null, [el("span", { class: "label", text: "Instagram" }),

@@ -46,8 +46,8 @@ window.SITE = {
   cabinetPhotoSlots: 6,
 
   // Infos pratiques
-  neighborhood: "",               // À confirmer
-  address: "",                    // À confirmer
+  neighborhood: "Maârif",
+  address: "400, boulevard Zerktouni, 3e étage",
   city: "Casablanca",
   mapEmbedUrl: "https://maps.google.com/maps?q=33.5995003,-7.6385892&z=17&output=embed",
   mapLink: "https://www.google.com/maps/place/centre+de+kin%C3%A9+plaza/@33.5995047,-7.6411641,629m/data=!3m2!1e3!4b1!4m6!3m5!1s0xda7d2f153638f9f:0x1fc223e5e85f72db!8m2!3d33.5995003!4d-7.6385892!16s%2Fg%2F11g6pgzmf1",
@@ -67,8 +67,9 @@ window.SITE = {
   },
 
   // Contact
-  phone: "",                      // À compléter
-  whatsapp: "",                   // À compléter, format 212XXXXXXXXX
+  phone: "05 22 27 35 75",
+  whatsapp: "212662217852",
+  whatsappDisplay: "06 62 21 78 52",
   whatsappMessage: "Bonjour, je souhaite prendre rendez-vous au cabinet Aura Plaza.",
   instagram: "https://www.instagram.com/auraplazabywafaajemrani/",
   googleRating: {
