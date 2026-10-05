@@ -162,6 +162,16 @@ h2, .gt {
 }
 h2 .placeholder, .gt .placeholder { -webkit-text-fill-color: currentColor; }
 
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Logotype (nom dessiné) : masque SVG rempli par la couleur des titres */
+.has-wordmark { background: none !important; -webkit-text-fill-color: currentColor !important; }
+.wordmark {
+  display: block; width: 100%; aspect-ratio: var(--wm-ratio, 5);
+  background: var(--title-fill);
+  -webkit-mask: var(--wm) center / contain no-repeat; mask: var(--wm) center / contain no-repeat;
+}
+
 /* Chiffres : sans-serif fin, chiffres alignés */
 .num {
   font-family: var(--sans); font-weight: 300; letter-spacing: -.02em;
@@ -248,6 +258,8 @@ h2 .placeholder, .gt .placeholder { -webkit-text-fill-color: currentColor; }
 .nav-open .brand-mark { color: var(--gold); }
 .brand-mark svg, .brand-mark img { width: 100%; height: 100%; }
 .brand-name { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-name.has-wordmark .wordmark { height: 19px; width: calc(19px * var(--wm-ratio, 5)); aspect-ratio: auto; }
+.nav-open .brand-name .wordmark { background: var(--gold); }
 
 .icon-btn {
   width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center;
@@ -301,6 +313,12 @@ h2 .placeholder, .gt .placeholder { -webkit-text-fill-color: currentColor; }
   background: var(--band-bg);
   color: var(--band-text); text-align: center;
 }
+.hero-canvas { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; display: block; }
+.hero.has-canvas .hero-aura { display: none; }
+.hero.has-canvas .hero-rating, .hero.has-canvas .btn-ghost {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
 .hero-aura {
   position: absolute; z-index: -1; left: 50%; top: 42%; width: 820px; height: 820px; max-width: none;
   transform: translate(-50%, -50%);
@@ -312,11 +330,34 @@ h2 .placeholder, .gt .placeholder { -webkit-text-fill-color: currentColor; }
 .hero-inner { display: flex; flex-direction: column; align-items: center; }
 .hero-mark { width: 92px; height: 92px; color: var(--mark); margin-bottom: 28px; animation: rise 1s ease both; }
 .hero-mark svg, .hero-mark img { width: 100%; height: 100%; }
-.hero-place { display: block; margin-top: 6px; }
 .hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
   font-size: .72rem; font-weight: 600; letter-spacing: .24em; text-transform: uppercase;
-  color: var(--eyebrow); margin-bottom: 18px; animation: rise 1s .1s ease both;
+  color: var(--eyebrow); margin-bottom: 22px; animation: rise 1s .1s ease both;
 }
+.hero-eyebrow .ico { width: 15px; height: 15px; }
+.hero-title.has-wordmark { width: min(84vw, 640px); margin: 0 auto 16px; }
+/* Sous-titre façon logo : « — cabinet de kinésithérapie — » */
+.hero-sub {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  font-size: clamp(.74rem, 3.3vw, 1.05rem); font-weight: 400; letter-spacing: .16em; text-transform: lowercase; white-space: nowrap;
+  color: var(--title); margin: 0 0 30px; animation: rise 1s .22s ease both;
+}
+.hero-sub::before, .hero-sub::after { content: ""; width: 18px; height: 1.5px; background: currentColor; flex: none; }
+@media (min-width: 640px) { .hero-sub { letter-spacing: .3em; gap: 16px; } .hero-sub::before, .hero-sub::after { width: 30px; } }
+/* Slogan */
+.hero-slogan {
+  font-family: var(--serif); font-size: clamp(1.75rem, 8vw, 2.8rem); line-height: 1.15; font-weight: 500;
+  color: var(--band-text); margin: 0 0 36px; max-width: 16em; animation: rise 1s .3s ease both;
+}
+.hero-slogan .slogan-a { display: block; }
+.hero-slogan .slogan-b {
+  display: block; font-style: italic; font-weight: 500;
+  color: var(--title); background: var(--title-fill);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  padding: 0 .08em;
+}
+.hero-slogan::after { content: ""; display: block; width: 56px; height: 1px; margin: 22px auto 0; background: var(--gold); }
 .hero h1 {
   font-size: clamp(3.4rem, 17vw, 7rem); line-height: .95; margin-bottom: 22px;
   text-transform: uppercase; letter-spacing: .04em;
@@ -324,8 +365,6 @@ h2 .placeholder, .gt .placeholder { -webkit-text-fill-color: currentColor; }
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   animation: rise 1s .18s ease both;
 }
-.hero-lead { font-size: 1.08rem; color: var(--band-soft); max-width: 34em; margin-bottom: 36px; animation: rise 1s .26s ease both; }
-.hero-lead .dot { display: block; color: var(--accent); margin-top: 4px; font-weight: 600; }
 .hero-actions { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; animation: rise 1s .34s ease both; }
 .hero-rating {
   display: inline-flex; align-items: center; gap: 8px; margin-top: 28px;
@@ -405,6 +444,7 @@ a.hero-rating:hover { border-color: var(--gold); }
 .brand-card::after { width: 108%; aspect-ratio: 1; border-style: dashed; }
 .brand-card-mark { width: 38%; max-width: 150px; margin-bottom: 26px; color: var(--mark); }
 .brand-card-mark svg { width: 100%; height: auto; }
+.brand-card-name.has-wordmark { width: 72%; max-width: 300px; }
 .brand-card-name { font-family: var(--serif); font-size: 2.3rem; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; margin: 0; line-height: 1.1; }
 .brand-card-title { font-size: .76rem; letter-spacing: .22em; text-transform: uppercase; color: var(--eyebrow); margin: 8px 0 0; }
 .brand-card-note { position: absolute; bottom: 18px; font-size: .8rem; }
@@ -535,6 +575,8 @@ address .strong { font-weight: 600; }
 .footer-brand { display: flex; align-items: center; gap: 14px; }
 .footer-mark { width: 48px; height: 48px; color: var(--gold); flex: none; }
 .footer-mark svg, .footer-mark img { width: 100%; height: 100%; }
+.footer-name.has-wordmark { width: 170px; margin-bottom: 8px; }
+.footer-name .wordmark { background: var(--cream); }
 .footer-name { font-family: var(--serif); font-size: 1.6rem; color: var(--cream); margin: 0; line-height: 1.1; text-transform: uppercase; letter-spacing: .06em; }
 .footer-tag { margin: 0; font-size: .74rem; letter-spacing: .2em; text-transform: uppercase; color: var(--gold); }
 .footer-col p { margin: 0 0 8px; }
@@ -603,13 +645,17 @@ address .strong { font-weight: 600; }
   .main-nav .nav-cta .bi { display: block; color: inherit; width: 17px; height: 17px; }
   .brand-mark { width: 40px; height: 40px; }
   .brand-name { font-size: 1.6rem; }
+  .brand-name.has-wordmark .wordmark { height: 22px; width: calc(22px * var(--wm-ratio, 5)); }
   .hero-mark { width: 112px; height: 112px; }
-  .hero-lead { font-size: 1.2rem; }
-  .hero-lead .dot { display: inline; margin: 0; }
-  .hero-lead .dot::before { content: "·"; margin: 0 12px; }
-  .hero-place { display: inline; margin: 0; }
-  .hero-place::before { content: "·"; margin: 0 12px; }
-  .hero-aura { width: 1100px; height: 1100px; }
+  .hero-slogan { max-width: none; }
+  .hero-slogan .slogan-a, .hero-slogan .slogan-b { display: inline; }
+  .hero-canvas { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; display: block; }
+.hero.has-canvas .hero-aura { display: none; }
+.hero.has-canvas .hero-rating, .hero.has-canvas .btn-ghost {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.hero-aura { width: 1100px; height: 1100px; }
   .highlights-wrap { margin-top: -56px; }
   .section-head { margin-bottom: 52px; }
   .cards { grid-template-columns: repeat(4, 1fr); }

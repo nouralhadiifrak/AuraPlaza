@@ -14,6 +14,7 @@ window.SITE = {
   // Identité
   name: "",                       // Nom du cabinet
   tagline: "Cabinet de kinésithérapie",
+  slogan: "",                     // phrase d'accroche sous le nom ; la partie après la virgule est mise en valeur
   practitioner: {
     name: "",
     title: "Kinésithérapeute",
@@ -30,8 +31,15 @@ window.SITE = {
 
   // Logo : symbole en SVG (utilise currentColor) — sinon logo.light (image) est utilisé
   logoMarkSvg: "",
+  logoWordmarkSvg: "",            // nom dessiné (SVG, une seule couleur) — sinon le nom s'écrit en texte
   logo: { light: "", dark: "" },
   favicon: "",                    // vide = icône générée depuis logoMarkSvg
+
+  // Fond animé de l'accueil (WebGL « Light Cables », couleurs de la palette)
+  // heroEffect: "cables" (par défaut) ou "none". Réglages facultatifs dans cables :
+  // { speed, hover, grab, count, bend, spread, thickness, widthStart, widthEnd, flow, pulses, direction }
+  heroEffect: "cables",
+  cables: {},
 
   // Spécialités. Icônes disponibles :
   // bone, spine, sport, neuro, lotus, lungs, drop, senior, hand

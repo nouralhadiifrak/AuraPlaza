@@ -24,7 +24,7 @@
     <div class="container header-inner">
       <a class="brand" href="#top" aria-label="Retour en haut de page">
         <span class="brand-mark" data-mark></span>
-        <span class="brand-name" data-bind="name"></span>
+        <span class="brand-name" data-bind="name" data-wordmark></span>
       </a>
       <nav class="main-nav" id="main-nav" aria-label="Navigation principale">
         <a href="#specialites"><svg class="bi" aria-hidden="true"><use href="#i-hand"/></svg><span>Spécialités</span></a>
@@ -54,8 +54,9 @@
       <div class="container hero-inner">
         <div class="hero-mark" data-mark></div>
         <p class="hero-eyebrow" id="hero-eyebrow"></p>
-        <h1 data-bind="name"></h1>
-        <p class="hero-lead" id="hero-lead"></p>
+        <h1 class="hero-title" data-bind="name" data-wordmark></h1>
+        <p class="hero-sub" data-bind="tagline"></p>
+        <p class="hero-slogan" id="hero-slogan"></p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#contact"><svg class="bi" aria-hidden="true"><use href="#i-cal"/></svg>Prendre rendez-vous</a>
           <a class="btn btn-ghost" id="hero-call"><svg class="bi" aria-hidden="true"><use href="#i-phone"/></svg>Appeler le cabinet</a>
@@ -200,7 +201,7 @@
       <div class="footer-brand">
         <span class="footer-mark" data-mark></span>
         <div>
-          <p class="footer-name" data-bind="name"></p>
+          <p class="footer-name" data-bind="name" data-wordmark></p>
           <p class="footer-tag" data-bind="tagline"></p>
         </div>
       </div>

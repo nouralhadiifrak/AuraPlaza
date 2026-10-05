@@ -137,6 +137,24 @@
     setChildren(n, [val(S[key], key === "name" ? "nom du cabinet ici" : "sous-titre ici")]);
   });
 
+  // Logotype (nom dessiné) : rendu en masque CSS pour prendre la couleur du thème
+  var wm = filled(S.logoWordmarkSvg) ? S.logoWordmarkSvg : "";
+  var wmRatio = 0;
+  if (wm) {
+    var vb = (wm.match(/viewBox="([^"]+)"/) || [])[1];
+    if (vb) { vb = vb.split(/\s+/).map(Number); wmRatio = vb[2] / vb[3]; }
+    root.style.setProperty("--wm", 'url("data:image/svg+xml,' + encodeURIComponent(wm) + '")');
+    if (wmRatio) root.style.setProperty("--wm-ratio", wmRatio.toFixed(4));
+  }
+  // Le logotype porte lui-même le nom (role="img") : aucun texte caché derrière
+  function wordmark() { return wm && wmRatio ? el("span", { class: "wordmark", role: "img", "aria-label": S.name || "" }) : null; }
+  qsa("[data-wordmark]").forEach(function (n) {
+    if (!wm || !wmRatio || !filled(S.name)) return;
+    n.textContent = "";
+    n.classList.add("has-wordmark");
+    n.appendChild(wordmark());
+  });
+
   // ---------- En-tête : état au défilement + menu mobile ----------
   var header = $("site-header");
   function onScroll() { if (header) header.classList.toggle("scrolled", window.scrollY > 40); }
@@ -156,14 +174,15 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") setMenu(false); });
 
   // ---------- 1. Accueil ----------
-  setChildren($("hero-eyebrow"), [el("span", null, [val(S.tagline, "sous-titre ici")]), place ? el("span", { class: "hero-place", text: place }) : ph("quartier ici")]);
-  var lead = [];
-  if (filled(P.name) || SHOW_PH) {
-    lead.push(val(P.name, "nom du praticien ici"));
-    if (filled(P.title)) lead.push(document.createTextNode(", " + P.title.toLowerCase()));
-  }
-  if (filled(P.yearsExperience)) lead.push(el("span", { class: "dot", text: P.yearsExperience + " ans d'expérience" }));
-  setChildren($("hero-lead"), lead);
+  setChildren($("hero-eyebrow"), place ? [icon("pin"), el("span", { text: place })] : [ph("quartier ici")]);
+  // Slogan : la partie après la première virgule est mise en valeur
+  var slogan = $("hero-slogan");
+  if (filled(S.slogan)) {
+    var cut = S.slogan.indexOf(",");
+    var a = cut > -1 ? S.slogan.slice(0, cut + 1) : S.slogan;
+    var b = cut > -1 ? S.slogan.slice(cut + 1).trim() : "";
+    setChildren(slogan, [el("span", { class: "slogan-a", text: a }), b ? document.createTextNode(" ") : null, b ? el("em", { class: "slogan-b", text: b }) : null]);
+  } else if (slogan) slogan.remove();
 
   var heroCall = $("hero-call");
   if (heroCall) { if (phoneDigits) heroCall.href = "tel:" + phoneDigits; else heroCall.remove(); }
@@ -219,7 +238,7 @@
   function brandCard(note) {
     return el("div", { class: "brand-card" }, [
       el("span", { class: "brand-card-mark", html: mark }),
-      el("p", { class: "brand-card-name gt" }, [val(S.name, "nom du cabinet ici")]),
+      el("p", { class: "brand-card-name gt" + (wordmark() ? " has-wordmark" : "") }, wordmark() ? [wordmark()] : [val(S.name, "nom du cabinet ici")]),
       filled(S.tagline) ? el("p", { class: "brand-card-title", text: S.tagline }) : null,
       note ? el("span", { class: "brand-card-note" }, [note]) : null
     ]);
@@ -438,6 +457,193 @@
 
   // Alternance des fonds (après suppression éventuelle de sections)
   qsa("main > .section:not(.contact-section)").forEach(function (sec, idx) { sec.classList.toggle("section-tint", idx % 2 === 1); });
+
+  // ---------- Fond animé de l'accueil : « Light Cables » (WebGL) ----------
+  // Port en JavaScript simple de l'effet Light Cables (Originkit), réglages du preset fourni.
+  // Couleurs reprises de la palette. Mode clair : câbles vert sur fond crème.
+  (function () {
+    var hero = document.querySelector(".hero");
+    if (!hero || S.heroEffect === "none") return;
+    var O = S.cables || {};
+    function n(v, fb) { return typeof v === "number" && isFinite(v) ? v : fb; }
+    function cl(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+    function rgb(hex, fb) {
+      var m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+      if (!m) return fb;
+      var x = parseInt(m[1], 16);
+      return [(x >> 16 & 255) / 255, (x >> 8 & 255) / 255, (x & 255) / 255];
+    }
+    var cfg = {
+      speed: cl(n(O.speed, 13), 0, 100) / 50,
+      hover: cl(n(O.hover, 120), 0, 200) / 100,
+      grab: cl(n(O.grab, 97), 10, 300) / 100,
+      count: Math.round(cl(n(O.count, 35), 4, 48)),
+      bend: cl(n(O.bend, 0), 0, 150) / 100,
+      spread: cl(n(O.spread, 155), 10, 300) / 100,
+      thick: cl(n(O.thickness, 123), 20, 400) / 100,
+      wStart: cl(n(O.widthStart, 0), 0, 300) / 100,
+      wEnd: cl(n(O.widthEnd, 300), 0, 300) / 100,
+      flow: cl(n(O.flow, 300), 0, 300) / 100,
+      pulses: cl(n(O.pulses, 2), 1, 12),
+      posX: cl(n(O.positionX, -13), -100, 100) / 100,
+      posY: cl(n(O.positionY, -21), -100, 100) / 100,
+      dir: O.direction || "btt"
+    };
+    var axis = cfg.dir === "ttb" || cfg.dir === "btt" ? 1 : 0;
+    var dirSign = cfg.dir === "rtl" || cfg.dir === "ttb" ? -1 : 1;
+    var COL = {
+      bg: rgb(C.green, [0.071, 0.247, 0.212]),
+      base: rgb(C.greenLight, [0.165, 0.42, 0.361]),
+      accent: rgb(C.gold, [0.769, 0.604, 0.271]),
+      high: rgb(C.cream, [0.91, 0.863, 0.769]),
+      lightBg: [0.969, 0.945, 0.902],
+      ink: rgb(C.greenLight, [0.165, 0.42, 0.361])
+    };
+
+    var canvas = document.createElement("canvas");
+    canvas.className = "hero-canvas";
+    canvas.setAttribute("aria-hidden", "true");
+    var gl = null;
+    try { gl = canvas.getContext("webgl", { antialias: false, alpha: false, depth: false, powerPreference: "low-power" }); } catch (e) {}
+    if (!gl) return; // pas de WebGL : on garde le fond dégradé
+
+    var VERT = "attribute vec2 a_pos;void main(){gl_Position=vec4(a_pos,0.0,1.0);}";
+    var FRAG = [
+      "#ifdef GL_FRAGMENT_PRECISION_HIGH", "precision highp float;", "#else", "precision mediump float;", "#endif",
+      "uniform vec2 uRes;uniform float uTime;uniform vec2 uMouse;uniform float uHover;",
+      "uniform vec3 uBg;uniform vec3 uBase;uniform vec3 uAccent;uniform vec3 uHigh;",
+      "uniform float uCount;uniform float uBend;uniform float uSpread;uniform float uWStart;uniform float uWEnd;",
+      "uniform float uAxis;uniform float uDir;uniform float uPosX;uniform float uPosY;uniform float uThick;",
+      "uniform float uFlow;uniform float uPulses;uniform float uGrab;uniform float uGrain;",
+      "uniform float uLight;uniform vec3 uLightBg;uniform vec3 uInk;",
+      "float sat(float x){return clamp(x,0.0,1.0);}",
+      "float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+34.56);return fract(p.x*p.y);}",
+      "float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);float a=h21(i),b=h21(i+vec2(1.0,0.0));float c=h21(i+vec2(0.0,1.0)),d=h21(i+vec2(1.0,1.0));return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}",
+      "float fbm3(vec2 p){float s=0.0,a=0.5;for(int i=0;i<3;i++){s+=a*vnoise(p);p=p*2.07+vec2(4.1,2.3);a*=0.5;}return s;}",
+      "void main(){",
+      " float ar=uRes.x/max(uRes.y,1.0);vec2 uv=gl_FragCoord.xy/uRes;vec2 p=(uv-0.5)*vec2(ar,1.0);float t=uTime;",
+      " vec2 pAdj=p-vec2(uPosX*ar,uPosY)*0.5;",
+      " vec3 glow=vec3(0.0);vec2 sm=p-vec2(-0.05,-0.28);",
+      " glow+=uBase*exp(-pow(length(sm*vec2(0.75,1.9))/0.42,1.7))*0.50*(0.6+0.6*fbm3(p*2.4+vec2(t*0.05,0.0)));",
+      " float extent=mix(ar,1.0,uAxis);float along=mix(pAdj.x,pAdj.y,uAxis)*uDir;float across=mix(pAdj.y,pAdj.x,uAxis);",
+      " float s01=sat((along+extent*0.5)/max(extent,0.001));",
+      " vec2 ptrRaw=(uMouse-0.5)*vec2(ar,1.0);float ptrAlong=mix(ptrRaw.x,ptrRaw.y,uAxis)*uDir;float ptrAcross=mix(ptrRaw.y,ptrRaw.x,uAxis);",
+      " float kAlong=-0.18;float kAcross=0.10;vec3 acc=vec3(0.0);float surge=0.0;",
+      " for(int i=0;i<48;i++){",
+      "  if(float(i)>=uCount)break;",
+      "  float fi=float(i)/max(uCount-1.0,1.0);float o=fi-0.5;float rnd=h21(vec2(fi*7.31,2.0));",
+      "  float kAlongi=kAlong+o*0.10+(rnd-0.5)*0.03;float bi=uBend*(0.88+0.24*rnd);",
+      "  float spread=uSpread*mix(uWStart,uWEnd,s01)*(0.090+0.34*sat((along-kAlong)*0.85+0.25));",
+      "  float bendAlong=sqrt((along-kAlongi)*(along-kAlongi)+0.0035);",
+      "  float yy=kAcross+o*spread-bi*bendAlong+0.008*sin(along*3.0+fi*19.0);",
+      "  float gx=exp(-pow((along-ptrAlong)/max(uGrab*0.30,0.02),2.0));",
+      "  yy=mix(yy,ptrAcross+o*spread*0.55,gx*0.60*uHover);",
+      "  float dd=(across-yy)/(uThick*0.0038);float core=1.0/(1.0+dd*dd*9.0);float sheath=1.0/(1.0+dd*dd*0.6);",
+      "  float ph=s01*uPulses-t*uFlow*0.55-rnd*0.22;float f=fract(ph);float pulse=exp(-pow((f-0.55)/0.15,2.0));",
+      "  float w=(0.22+1.60*pulse)*(0.55+0.45*rnd);",
+      "  acc+=(uHigh*core*1.45+uAccent*sheath*0.20)*w;surge+=core*gx;",
+      " }",
+      " float feed=smoothstep(0.0,0.09,s01)*smoothstep(1.02,0.30,s01);",
+      " glow+=acc*feed*0.20;glow+=uHigh*surge*0.05*uHover;",
+      " float grain=(h21(gl_FragCoord.xy+fract(uTime)*71.0)-0.5)*uGrain;",
+      " vec3 dark=uBg+glow+grain;",
+      " float lum=dot(glow,vec3(0.40,0.45,0.15));",
+      " vec3 light=mix(uLightBg,uInk,sat(lum*1.25))+grain*0.6;",
+      " gl_FragColor=vec4(max(mix(dark,light,uLight),0.0),1.0);",
+      "}"
+    ].join("\n");
+
+    function sh(type, src) {
+      var x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x);
+      if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) { gl.deleteShader(x); return null; }
+      return x;
+    }
+    var vs = sh(gl.VERTEX_SHADER, VERT), fs = sh(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) return;
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+    gl.useProgram(prog);
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    var loc = gl.getAttribLocation(prog, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    var U = {};
+    function u(name) { if (!(name in U)) U[name] = gl.getUniformLocation(prog, name); return U[name]; }
+
+    hero.insertBefore(canvas, hero.firstChild);
+    hero.classList.add("has-canvas");
+
+    // Uniformes fixes
+    gl.uniform3fv(u("uBg"), COL.bg); gl.uniform3fv(u("uBase"), COL.base);
+    gl.uniform3fv(u("uAccent"), COL.accent); gl.uniform3fv(u("uHigh"), COL.high);
+    gl.uniform3fv(u("uLightBg"), COL.lightBg); gl.uniform3fv(u("uInk"), COL.ink);
+    gl.uniform1f(u("uCount"), cfg.count); gl.uniform1f(u("uBend"), cfg.bend); gl.uniform1f(u("uSpread"), cfg.spread);
+    gl.uniform1f(u("uWStart"), cfg.wStart); gl.uniform1f(u("uWEnd"), cfg.wEnd);
+    gl.uniform1f(u("uAxis"), axis); gl.uniform1f(u("uDir"), dirSign);
+    gl.uniform1f(u("uPosX"), cfg.posX); gl.uniform1f(u("uPosY"), cfg.posY);
+    gl.uniform1f(u("uThick"), cfg.thick); gl.uniform1f(u("uFlow"), cfg.flow);
+    gl.uniform1f(u("uPulses"), cfg.pulses); gl.uniform1f(u("uGrab"), cfg.grab); gl.uniform1f(u("uGrain"), 0.012);
+
+    var reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    var ptr = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, on: 0, target: 0 };
+    var raf = 0, last = performance.now(), clock = 4.0, visible = true, lightMix = isDark() ? 0 : 1;
+
+    function frame(now) {
+      raf = 0;
+      var dt = Math.min(0.05, (now - last) / 1000); last = now;
+      if (!reduce) clock = (clock + dt * cfg.speed) % 3600;
+      var k = 1 - Math.exp(-6 * dt);
+      ptr.on += (ptr.target - ptr.on) * k;
+      ptr.x += ((ptr.target > 0 ? ptr.tx : 0.5) - ptr.x) * k;
+      ptr.y += ((ptr.target > 0 ? ptr.ty : 0.5) - ptr.y) * k;
+      var lt = isDark() ? 0 : 1;
+      lightMix = reduce ? lt : lightMix + (lt - lightMix) * Math.min(1, dt * 6);
+
+      // Résolution limitée pour rester fluide sur téléphone
+      var small = window.innerWidth < 768;
+      var dpr = Math.min(window.devicePixelRatio || 1, small ? 1 : 1.5) * (small ? 0.85 : 1);
+      var cw = hero.clientWidth || 1, ch = hero.clientHeight || 1;
+      var bw = Math.max(1, Math.round(cw * dpr)), bh = Math.max(1, Math.round(ch * dpr));
+      if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+      gl.viewport(0, 0, bw, bh);
+      gl.uniform2f(u("uRes"), bw, bh);
+      gl.uniform1f(u("uTime"), clock);
+      gl.uniform2f(u("uMouse"), ptr.x, 1 - ptr.y);
+      gl.uniform1f(u("uHover"), Math.min(1, ptr.on) * cfg.hover);
+      gl.uniform1f(u("uLight"), lightMix);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      if (!reduce && visible && !document.hidden) raf = requestAnimationFrame(frame);
+    }
+    function kick() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+
+    function track(e) {
+      var r = hero.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return;
+      ptr.tx = cl((e.clientX - r.left) / r.width, 0, 1);
+      ptr.ty = cl((e.clientY - r.top) / r.height, 0, 1);
+      ptr.target = 1;
+      if (reduce) kick();
+    }
+    hero.addEventListener("pointermove", track, { passive: true });
+    hero.addEventListener("pointerenter", track, { passive: true });
+    hero.addEventListener("pointerleave", function () { ptr.target = 0; });
+
+    // Pause quand l'accueil n'est plus visible ou l'onglet est caché
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (en) { visible = en[0].isIntersecting; if (visible) kick(); }).observe(hero);
+    }
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) kick(); });
+    window.addEventListener("resize", kick);
+    if (themeBtn) themeBtn.addEventListener("click", function () { kick(); if (reduce) setTimeout(kick, 30); });
+    if (window.matchMedia) {
+      var mqd = window.matchMedia("(prefers-color-scheme: dark)");
+      if (mqd.addEventListener) mqd.addEventListener("change", kick);
+    }
+    kick();
+  })();
 
   // ---------- Apparition au défilement ----------
   var reveals = qsa(".reveal");
