@@ -24,8 +24,9 @@ window.SITE = {
     videoPoster: ""               // image affichée avant la lecture
   },
 
-  // Couleurs de marque : vert = couleur principale, sable = accent, deep = version foncée du vert
-  colors: { primary: "#254538", accent: "#d9cbb0", deep: "#1a3128" },
+  // Palette : green → greenLight = dégradé de fond, gold = titres (mode sombre), cream = texte (mode sombre)
+  // En mode clair, le fond devient crème et les titres prennent le dégradé vert.
+  colors: { green: "#123F36", greenLight: "#2A6B5C", gold: "#C49A45", cream: "#E8DCC4" },
 
   // Logo : symbole en SVG (utilise currentColor) — sinon logo.light (image) est utilisé
   logoMarkSvg: "",
@@ -58,7 +59,6 @@ window.SITE = {
     // { label: "Lundi – Vendredi", days: [1, 2, 3, 4, 5], open: "09:00", close: "18:00" },
     // { label: "Samedi – Dimanche", days: [6, 0], closed: true }
   ],
-  prescriptionRequired: null,     // false = affiche "Sans ordonnance" dans les points clés
   insuranceShort: "",             // ex. "Toutes assurances" (points clés)
 
   // Questions fréquentes

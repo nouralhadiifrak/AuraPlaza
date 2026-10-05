@@ -94,7 +94,7 @@
   // ---------- Couleurs ----------
   var C = S.colors || {};
   var root = document.documentElement;
-  [["--green", C.primary], ["--sand", C.accent], ["--green-deep", C.deep]].forEach(function (p) {
+  [["--g1", C.green], ["--g2", C.greenLight], ["--gold", C.gold], ["--cream", C.cream]].forEach(function (p) {
     if (filled(p[1])) root.style.setProperty(p[0], p[1]);
   });
 
@@ -108,7 +108,7 @@
   if (filled(S.favicon)) {
     document.head.appendChild(el("link", { rel: "icon", href: asset(S.favicon) }));
   } else if (mark) {
-    var fav = mark.replace("currentColor", C.primary || "#254538");
+    var fav = mark.replace("currentColor", C.green || "#123F36");
     document.head.appendChild(el("link", { rel: "icon", href: "data:image/svg+xml," + encodeURIComponent(fav) }));
   }
 
@@ -174,7 +174,7 @@
       if (filled(R.url)) heroRating.href = R.url;
       setChildren(heroRating, [
         el("span", { class: "stars", "aria-hidden": "true", text: "★★★★★" }),
-        el("strong", { text: R.score + "/5" }),
+        el("strong", { class: "num", text: R.score + "/5" }),
         document.createTextNode(" · Avis Google")
       ]);
       heroRating.setAttribute("aria-label", "Note Google : " + R.score + " sur 5. Voir les avis");
@@ -188,12 +188,11 @@
   if (filled(P.yearsExperience)) hl.push({ i: "award", big: P.yearsExperience + " ans", small: "d'expérience" });
   if (filled(R.score)) hl.push({ i: "star", big: R.score + "/5", small: "note Google", href: R.url });
   if (HV.offered === true) hl.push({ i: "home", big: "À domicile", small: filled(HV.area) ? HV.area : "sur rendez-vous" });
-  if (S.prescriptionRequired === false) hl.push({ i: "doc", big: "Sans ordonnance", small: "rendez-vous direct" });
   if (filled(S.insuranceShort)) hl.push({ i: "shield", big: S.insuranceShort, small: "acceptées" });
   var hlWrap = $("essentiel");
   if (hl.length >= 2) {
     setChildren($("highlights"), hl.slice(0, 4).map(function (h) {
-      var inner = [icon(h.i), el("span", { class: "hl-text" }, [el("strong", { text: h.big }), el("span", { text: h.small })])];
+      var inner = [icon(h.i), el("span", { class: "hl-text" }, [el("strong", { class: /^\d/.test(h.big) ? "num" : null, text: h.big }), el("span", { text: h.small })])];
       return el("li", null, [h.href ? el("a", { href: h.href, target: "_blank", rel: "noopener" }, inner) : el("div", null, inner)]);
     }));
   } else if (hlWrap) hlWrap.remove();
@@ -220,7 +219,7 @@
   function brandCard(note) {
     return el("div", { class: "brand-card" }, [
       el("span", { class: "brand-card-mark", html: mark }),
-      el("p", { class: "brand-card-name" }, [val(S.name, "nom du cabinet ici")]),
+      el("p", { class: "brand-card-name gt" }, [val(S.name, "nom du cabinet ici")]),
       filled(S.tagline) ? el("p", { class: "brand-card-title", text: S.tagline }) : null,
       note ? el("span", { class: "brand-card-note" }, [note]) : null
     ]);
@@ -240,7 +239,7 @@
   setChildren($("practitioner-name"), [val(P.name, "nom ici")]);
   setChildren($("practitioner-title"), [val(P.title, "titre ici")]);
   setChildren($("practitioner-experience"), filled(P.yearsExperience)
-    ? [el("strong", { text: P.yearsExperience }), el("span", { text: "ans d'expérience" })]
+    ? [el("strong", { class: "num", text: P.yearsExperience }), el("span", { text: "ans d'expérience" })]
     : [ph("années d'expérience ici")]);
   var quals = (P.qualifications || []).filter(filled);
   setChildren($("practitioner-qualifications"), quals.length
@@ -318,7 +317,7 @@
   ]);
   setChildren($("access-block"), filled(S.access) ? [el("p", { class: "muted", text: S.access })] : []);
   var dir = $("directions-link");
-  if (dir && filled(S.mapLink)) { dir.href = S.mapLink; dir.hidden = false; dir.appendChild(icon("arrow")); }
+  if (dir && filled(S.mapLink)) { dir.href = S.mapLink; dir.hidden = false; }
 
   var hvCard = $("home-visits");
   if (HV.offered === true) {
@@ -350,6 +349,8 @@
     return el("details", idx === 0 ? { open: true } : null, [el("summary", { text: f.q }), el("div", { class: "faq-a" }, [el("p", null, [val(f.a, f.label || "réponse ici")])])]);
   }));
   if (!faqs.length) { var fq = $("faq"); if (fq) fq.remove(); }
+  var faqWa = $("faq-wa");
+  if (faqWa) { if (waDigits) faqWa.href = waLink("Bonjour, j'ai une question : "); else { var fm = $("faq-more"); if (fm) fm.remove(); } }
 
   // ---------- 7. Contact ----------
   function contactItem(ic, label, value, href, ext) {
@@ -375,10 +376,11 @@
     hours.length ? el("p", { class: "muted", text: hours.map(function (h) { return (h.label || h.days) + " : " + hoursText(h); }).join(" · ") }) : null
   ]);
   var links = [];
-  if (phoneDigits) links.push(el("a", { href: "tel:" + phoneDigits, text: S.phone }));
-  if (waDigits) links.push(el("a", { href: waLink(), target: "_blank", rel: "noopener", text: "WhatsApp" }));
-  if (filled(S.instagram)) links.push(el("a", { href: S.instagram, target: "_blank", rel: "noopener", text: "Instagram" }));
-  if (filled(R.url)) links.push(el("a", { href: R.url, target: "_blank", rel: "noopener", text: "Avis Google" }));
+  function footLink(ic, href, text, ext) { return el("a", { href: href, target: ext ? "_blank" : null, rel: ext ? "noopener" : null }, [icon(ic), text]); }
+  if (phoneDigits) links.push(footLink("phone", "tel:" + phoneDigits, S.phone));
+  if (waDigits) links.push(footLink("wa", waLink(), "WhatsApp", true));
+  if (filled(S.instagram)) links.push(footLink("instagram", S.instagram, "Instagram", true));
+  if (filled(R.url)) links.push(footLink("star", R.url, "Avis Google", true));
   setChildren($("footer-links"), [el("p", { class: "footer-title", text: "Contact" })].concat(links.map(function (a) { return el("p", null, [a]); })));
   setChildren($("footer-copy"), [document.createTextNode("© " + new Date().getFullYear() + " " + siteName + (place ? " · " + place : ""))]);
 
