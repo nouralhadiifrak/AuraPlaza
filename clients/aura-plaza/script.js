@@ -4,23 +4,31 @@
 
   var S = window.SITE || {};
   var P = S.practitioner || {};
-  var IMG = "images/";
+  var R = S.googleRating || {};
+  var HV = S.homeVisits || {};
+  var F = S.faq || {};
+  // Chemin d'une image du dossier ./images (ou version intégrée si window.SITE_ASSETS existe)
+  function asset(f) { return (window.SITE_ASSETS && window.SITE_ASSETS[f]) || "images/" + f; }
+  var SHOW_PH = S.showPlaceholders !== false; // false = masque ce qui manque au lieu d'afficher "[...]"
 
   // ---------- Utilitaires ----------
   function $(id) { return document.getElementById(id); }
+  function qsa(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
 
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     if (attrs) {
       Object.keys(attrs).forEach(function (k) {
-        if (attrs[k] === null || attrs[k] === undefined || attrs[k] === false) return;
-        if (k === "text") node.textContent = attrs[k];
-        else if (k === "class") node.className = attrs[k];
-        else node.setAttribute(k, attrs[k] === true ? "" : attrs[k]);
+        var v = attrs[k];
+        if (v === null || v === undefined || v === false) return;
+        if (k === "text") node.textContent = v;
+        else if (k === "html") node.innerHTML = v; // uniquement pour les icônes internes
+        else if (k === "class") node.className = v;
+        else node.setAttribute(k, v === true ? "" : v);
       });
     }
     (children || []).forEach(function (c) {
-      if (c === null || c === undefined) return;
+      if (c === null || c === undefined || c === false) return;
       node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
     });
     return node;
@@ -31,242 +39,356 @@
     return v !== undefined && v !== null && String(v).trim() !== "";
   }
 
-  // Espace réservé visible : "[vos tarifs ici]"
-  function ph(label) { return el("span", { class: "placeholder", text: "[" + label + "]" }); }
-
-  // Valeur ou espace réservé
+  // Espace réservé visible "[...]" (ou rien si showPlaceholders = false)
+  function ph(label) { return SHOW_PH ? el("span", { class: "placeholder", text: "[" + label + "]" }) : null; }
   function val(v, label) { return filled(v) ? document.createTextNode(String(v)) : ph(label); }
 
   function setChildren(node, children) {
     if (!node) return;
     node.textContent = "";
-    children.forEach(function (c) { if (c) node.appendChild(c); });
+    (children || []).forEach(function (c) { if (c) node.appendChild(c); });
   }
 
-  // Bloc neutre en attendant une photo
-  function photoSlot(label, extraClass) {
-    return el("div", { class: "photo-slot " + (extraClass || ""), role: "img", "aria-label": label }, [
-      el("span", { text: "[" + label + "]" })
-    ]);
+  function lazyImg(file, alt) {
+    return el("img", { src: asset(file), alt: alt || "", loading: "lazy", decoding: "async" });
   }
 
-  function lazyImg(file, alt, extraClass) {
-    return el("img", { src: IMG + file, alt: alt || "", loading: "lazy", decoding: "async", class: extraClass || "" });
-  }
-
+  var phoneDigits = String(S.phone || "").replace(/[^\d+]/g, "");
+  var waDigits = String(S.whatsapp || "").replace(/\D/g, "");
   function waLink(text) {
-    var num = String(S.whatsapp || "").replace(/\D/g, "");
-    return "https://wa.me/" + num + "?text=" + encodeURIComponent(text || S.whatsappMessage || "Bonjour");
+    return "https://wa.me/" + waDigits + "?text=" + encodeURIComponent(text || S.whatsappMessage || "Bonjour");
   }
 
-  // ---------- Thème (couleurs + mode sombre) ----------
+  // ---------- Icônes (traits, 24×24) ----------
+  var ICONS = {
+    bone: '<path d="M8.2 5.3a2.4 2.4 0 1 0-2.9 2.9 2.4 2.4 0 1 0 2.6 3.4l4.5 4.5a2.4 2.4 0 1 0 3.4 2.6 2.4 2.4 0 1 0 2.9-2.9 2.4 2.4 0 1 0-2.6-3.4L11.6 7.9a2.4 2.4 0 1 0-3.4-2.6Z"/>',
+    spine: '<rect x="8" y="2.5" width="8" height="4" rx="1.6"/><rect x="7.5" y="7.5" width="9" height="4" rx="1.6"/><rect x="7.5" y="12.5" width="9" height="4" rx="1.6"/><rect x="8" y="17.5" width="8" height="4" rx="1.6"/>',
+    sport: '<circle cx="15.5" cy="4.5" r="1.8"/><path d="m6 21 3.2-5.2 3.3 2.2.8-5.8-3.8-1.7L6.6 13M13.3 12.2l2.4 2.6 3.6-.6M6.5 8.5l3-2.5h4.2l1.8 3"/>',
+    neuro: '<circle cx="12" cy="12" r="3"/><path d="M12 9V4.5M15 12h4.5M12 15v4.5M9 12H4.5M14.1 9.9l3.2-3.2M9.9 14.1l-3.2 3.2"/><circle cx="12" cy="3.5" r="1"/><circle cx="20.5" cy="12" r="1"/><circle cx="12" cy="20.5" r="1"/><circle cx="3.5" cy="12" r="1"/>',
+    lotus: '<path d="M12 20c-4.4 0-8-2.6-8-7.2 3.2 0 6.2 1.6 8 4.2 1.8-2.6 4.8-4.2 8-4.2 0 4.6-3.6 7.2-8 7.2Z"/><path d="M12 17c-2.2-2.6-2.6-6.4 0-11.5 2.6 5.1 2.2 8.9 0 11.5Z"/>',
+    lungs: '<path d="M12 3.5v7.5M12 11l-2.6 2M12 11l2.6 2"/><path d="M8.6 6.8C6 6.8 4 11 4 15.6 4 18.2 5.1 20 7 20c2 0 2.6-1.4 2.6-3.4V8.6c0-1-.4-1.8-1-1.8ZM15.4 6.8c2.6 0 4.6 4.2 4.6 8.8 0 2.6-1.1 4.4-3 4.4-2 0-2.6-1.4-2.6-3.4V8.6c0-1 .4-1.8 1-1.8Z"/>',
+    drop: '<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11Z"/><path d="M9 14.5a3 3 0 0 0 3 3"/>',
+    senior: '<circle cx="10" cy="4.5" r="1.8"/><path d="M10 8v6l-2.2 7M10 14l3 3v4M10 9.2 7 12.5M10 9.2l3.8 2.3h1.7M16.5 11.5V21"/>',
+    hand: '<path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V14c0 4-2.6 7-6.2 7-2.4 0-4-1-5.4-3l-1.6-3.1a1.5 1.5 0 0 1 2.5-1.7L8 15"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/>',
+    pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    home: '<path d="M4 11 12 4l8 7M6 9.5V20h12V9.5M10 20v-5h4v5"/>',
+    award: '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4 7 21l5-2.6 5 2.6-1.6-7.6"/>',
+    star: '<path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8Z"/>',
+    doc: '<path d="M7 3h7l4 4v14H7Z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
+    shield: '<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
+    instagram: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".6"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>'
+  };
+  function icon(name, cls) {
+    if (name === "phone" || name === "wa") { // symboles définis dans index.html
+      return el("span", { class: "ico " + (cls || ""), "aria-hidden": "true", html: '<svg viewBox="0 0 24 24"><use href="#i-' + name + '"/></svg>' });
+    }
+    return el("span", {
+      class: "ico " + (cls || ""), "aria-hidden": "true",
+      html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || ICONS.hand) + "</svg>"
+    });
+  }
+  qsa("[data-icon]").forEach(function (n) { n.appendChild(icon(n.getAttribute("data-icon"))); });
+
+  // ---------- Couleurs ----------
   var C = S.colors || {};
   var root = document.documentElement;
-  if (C.primary) root.style.setProperty("--brand", C.primary);
-  if (C.accent) root.style.setProperty("--brand-accent", C.accent);
-  if (C.dark) {
-    if (C.dark.background) root.style.setProperty("--d-bg", C.dark.background);
-    if (C.dark.surface) root.style.setProperty("--d-surface", C.dark.surface);
-    if (C.dark.primary) root.style.setProperty("--d-brand", C.dark.primary);
-    if (C.dark.accent) root.style.setProperty("--d-brand-accent", C.dark.accent);
+  [["--green", C.primary], ["--sand", C.accent], ["--green-deep", C.deep]].forEach(function (p) {
+    if (filled(p[1])) root.style.setProperty(p[0], p[1]);
+  });
+
+  // ---------- Logo ----------
+  var mark = filled(S.logoMarkSvg) ? S.logoMarkSvg : "";
+  qsa("[data-mark]").forEach(function (n) {
+    if (mark) n.innerHTML = mark;
+    else if (S.logo && S.logo.light) n.appendChild(el("img", { src: asset(S.logo.light), alt: "" }));
+    else n.hidden = true;
+  });
+  if (filled(S.favicon)) {
+    document.head.appendChild(el("link", { rel: "icon", href: asset(S.favicon) }));
+  } else if (mark) {
+    var fav = mark.replace("currentColor", C.primary || "#254538");
+    document.head.appendChild(el("link", { rel: "icon", href: "data:image/svg+xml," + encodeURIComponent(fav) }));
   }
 
+  // ---------- Thème clair / sombre ----------
   function isDark() {
     var t = root.getAttribute("data-theme");
     if (t) return t === "dark";
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
   }
-
-  function renderLogo() {
-    var box = $("hero-logo");
-    if (!box) return;
-    var L = S.logo || {};
-    var file = isDark() ? (L.dark || L.light) : (L.light || L.dark);
-    setChildren(box, file ? [el("img", { src: IMG + file, alt: "Logo " + (S.name || ""), width: "240" })] : []);
-    box.hidden = !file;
-    var meta = document.querySelector('meta[name="theme-color"]');
-    if (!meta) { meta = el("meta", { name: "theme-color" }); document.head.appendChild(meta); }
-    meta.setAttribute("content", getComputedStyle(root).getPropertyValue("--bg").trim() || "#ffffff");
-  }
-
-  var toggle = document.querySelector(".theme-toggle");
-  if (toggle) {
-    toggle.addEventListener("click", function () {
-      var next = isDark() ? "light" : "dark";
-      root.setAttribute("data-theme", next);
-      try { localStorage.setItem("theme", next); } catch (e) {}
-      renderLogo();
-    });
-  }
-  if (window.matchMedia) {
-    var mq = window.matchMedia("(prefers-color-scheme: dark)");
-    if (mq.addEventListener) mq.addEventListener("change", renderLogo);
-  }
-
-  // ---------- En-tête / méta ----------
-  var siteName = S.name || "Cabinet de kinésithérapie";
-  document.title = siteName + " — " + (S.tagline || "Kinésithérapie") + (S.city ? ", " + S.city : "");
-  var desc = document.querySelector('meta[name="description"]');
-  if (desc) desc.setAttribute("content", siteName + " · " + [P.name, P.title, S.neighborhood, S.city].filter(filled).join(", "));
-  if (S.favicon) document.head.appendChild(el("link", { rel: "icon", href: IMG + S.favicon }));
-
-  Array.prototype.forEach.call(document.querySelectorAll("[data-bind]"), function (n) {
-    var key = n.getAttribute("data-bind");
-    setChildren(n, [val(S[key], key === "name" ? "nom du cabinet ici" : "slogan ici")]);
+  var themeBtn = document.querySelector(".theme-toggle");
+  if (themeBtn) themeBtn.addEventListener("click", function () {
+    var next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
   });
 
-  // ---------- 1. Hero ----------
-  renderLogo();
-  setChildren($("hero-practitioner"), [
-    val(P.name, "nom du praticien ici"), document.createTextNode(" — "), val(P.title, "titre ici")
-  ]);
-  var meta = [];
-  meta.push(el("span", null, [val(S.neighborhood, "quartier ici"), document.createTextNode(S.city ? ", " + S.city : "")]));
-  if (filled(P.yearsExperience)) meta.push(el("span", { text: P.yearsExperience + " ans d'expérience" }));
-  setChildren($("hero-meta"), meta);
+  // ---------- Méta / textes communs ----------
+  var siteName = S.name || "Cabinet de kinésithérapie";
+  var place = [S.neighborhood, S.city].filter(filled).join(", ");
+  document.title = siteName + " — " + (S.tagline || "Kinésithérapie") + (place ? ", " + place : "");
+  var desc = document.querySelector('meta[name="description"]');
+  if (desc) desc.setAttribute("content", [siteName, P.name && P.title ? P.name + ", " + P.title.toLowerCase() : P.name, place].filter(filled).join(" · "));
 
-  var R = S.googleRating || {};
+  qsa("[data-bind]").forEach(function (n) {
+    var key = n.getAttribute("data-bind");
+    setChildren(n, [val(S[key], key === "name" ? "nom du cabinet ici" : "sous-titre ici")]);
+  });
+
+  // ---------- En-tête : état au défilement + menu mobile ----------
+  var header = $("site-header");
+  function onScroll() { if (header) header.classList.toggle("scrolled", window.scrollY > 40); }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  var menuBtn = document.querySelector(".menu-toggle");
+  function setMenu(open) {
+    document.body.classList.toggle("nav-open", open);
+    if (menuBtn) {
+      menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      menuBtn.setAttribute("aria-label", open ? "Fermer le menu" : "Ouvrir le menu");
+    }
+  }
+  if (menuBtn) menuBtn.addEventListener("click", function () { setMenu(!document.body.classList.contains("nav-open")); });
+  qsa("#main-nav a").forEach(function (a) { a.addEventListener("click", function () { setMenu(false); }); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") setMenu(false); });
+
+  // ---------- 1. Accueil ----------
+  setChildren($("hero-eyebrow"), [el("span", null, [val(S.tagline, "sous-titre ici")]), place ? el("span", { class: "hero-place", text: place }) : ph("quartier ici")]);
+  var lead = [];
+  if (filled(P.name) || SHOW_PH) {
+    lead.push(val(P.name, "nom du praticien ici"));
+    if (filled(P.title)) lead.push(document.createTextNode(", " + P.title.toLowerCase()));
+  }
+  if (filled(P.yearsExperience)) lead.push(el("span", { class: "dot", text: P.yearsExperience + " ans d'expérience" }));
+  setChildren($("hero-lead"), lead);
+
+  var heroCall = $("hero-call");
+  if (heroCall) { if (phoneDigits) heroCall.href = "tel:" + phoneDigits; else heroCall.remove(); }
+
   var heroRating = $("hero-rating");
   if (heroRating) {
     if (filled(R.score)) {
-      heroRating.href = R.url || "#";
+      if (filled(R.url)) heroRating.href = R.url;
       setChildren(heroRating, [
-        el("span", { class: "stars", "aria-hidden": "true", text: "★" }),
+        el("span", { class: "stars", "aria-hidden": "true", text: "★★★★★" }),
         el("strong", { text: R.score + "/5" }),
-        el("span", { text: " sur Google" })
+        document.createTextNode(" · Avis Google")
       ]);
-      heroRating.setAttribute("aria-label", "Note Google : " + R.score + " sur 5 — voir les avis");
-    } else {
-      heroRating.removeAttribute("href");
+      heroRating.setAttribute("aria-label", "Note Google : " + R.score + " sur 5. Voir les avis");
+    } else if (SHOW_PH) {
       setChildren(heroRating, [ph("note Google ici")]);
-    }
+    } else heroRating.remove();
   }
+
+  // ---------- Points clés ----------
+  var hl = [];
+  if (filled(P.yearsExperience)) hl.push({ i: "award", big: P.yearsExperience + " ans", small: "d'expérience" });
+  if (filled(R.score)) hl.push({ i: "star", big: R.score + "/5", small: "note Google", href: R.url });
+  if (HV.offered === true) hl.push({ i: "home", big: "À domicile", small: filled(HV.area) ? HV.area : "sur rendez-vous" });
+  if (S.prescriptionRequired === false) hl.push({ i: "doc", big: "Sans ordonnance", small: "rendez-vous direct" });
+  if (filled(S.insuranceShort)) hl.push({ i: "shield", big: S.insuranceShort, small: "acceptées" });
+  var hlWrap = $("essentiel");
+  if (hl.length >= 2) {
+    setChildren($("highlights"), hl.slice(0, 4).map(function (h) {
+      var inner = [icon(h.i), el("span", { class: "hl-text" }, [el("strong", { text: h.big }), el("span", { text: h.small })])];
+      return el("li", null, [h.href ? el("a", { href: h.href, target: "_blank", rel: "noopener" }, inner) : el("div", null, inner)]);
+    }));
+  } else if (hlWrap) hlWrap.remove();
 
   // ---------- 2. Spécialités ----------
   var specs = (S.specialties || []).filter(function (s) { return s && filled(s.title); });
+  var list = $("specialties-list");
   if (specs.length) {
-    setChildren($("specialties-list"), specs.map(function (s) {
-      var link = el("a", { class: "card-link", href: "#contact", "data-specialty": s.title, text: "Prendre rendez-vous" });
-      return el("article", { class: "card" }, [
+    setChildren(list, specs.map(function (s) {
+      return el("a", { class: "card reveal", href: "#contact", "data-specialty": s.title }, [
+        icon(s.icon || "hand", "card-icon"),
         el("h3", { text: s.title }),
-        el("p", null, [val(s.text, "description ici")]),
-        link
+        filled(s.text) ? el("p", { text: s.text }) : (SHOW_PH ? el("p", null, [ph("description ici")]) : null),
+        el("span", { class: "card-more" }, ["Prendre rendez-vous", icon("arrow")])
       ]);
     }));
-  } else {
-    setChildren($("specialties-list"), [1, 2, 3].map(function () {
-      return el("article", { class: "card" }, [el("h3", null, [ph("spécialité ici")]), el("p", null, [ph("description ici")])]);
+  } else if (SHOW_PH) {
+    setChildren(list, [1, 2, 3].map(function () {
+      return el("div", { class: "card" }, [icon("hand", "card-icon"), el("h3", null, [ph("spécialité ici")]), el("p", null, [ph("description ici")])]);
     }));
   }
 
-  // ---------- 3. Le praticien ----------
+  // ---------- 3. Praticien ----------
+  function brandCard(note) {
+    return el("div", { class: "brand-card" }, [
+      el("span", { class: "brand-card-mark", html: mark }),
+      el("p", { class: "brand-card-name" }, [val(S.name, "nom du cabinet ici")]),
+      filled(S.tagline) ? el("p", { class: "brand-card-title", text: S.tagline }) : null,
+      note ? el("span", { class: "brand-card-note" }, [note]) : null
+    ]);
+  }
   var media = $("practitioner-media");
   if (filled(P.video)) {
     setChildren(media, [el("video", {
-      src: IMG + P.video, controls: true, preload: "none", playsinline: true,
-      poster: filled(P.videoPoster) ? IMG + P.videoPoster : null,
-      "aria-label": "Vidéo de présentation de " + (P.name || "la praticienne")
+      src: asset(P.video), controls: true, preload: "none", playsinline: true,
+      poster: filled(P.videoPoster) ? asset(P.videoPoster) : (filled(P.photo) ? asset(P.photo) : null),
+      "aria-label": "Vidéo de présentation" + (P.name ? " de " + P.name : "")
     })]);
   } else if (filled(P.photo)) {
-    setChildren(media, [lazyImg(P.photo, P.name ? "Portrait de " + P.name : "Portrait du praticien")]);
+    setChildren(media, [lazyImg(P.photo, P.name ? "Portrait de " + P.name : "Portrait")]);
   } else {
-    setChildren(media, [photoSlot("photo ou vidéo à venir", "portrait")]);
+    setChildren(media, [brandCard(ph("photo ou vidéo à venir"))]);
   }
-  setChildren($("practitioner-name"), [val(P.name, "nom ici"), document.createTextNode(" · "), val(P.title, "titre ici")]);
+  setChildren($("practitioner-name"), [val(P.name, "nom ici")]);
+  setChildren($("practitioner-title"), [val(P.title, "titre ici")]);
   setChildren($("practitioner-experience"), filled(P.yearsExperience)
-    ? [el("strong", { text: P.yearsExperience }), document.createTextNode(" ans d'expérience")]
+    ? [el("strong", { text: P.yearsExperience }), el("span", { text: "ans d'expérience" })]
     : [ph("années d'expérience ici")]);
   var quals = (P.qualifications || []).filter(filled);
   setChildren($("practitioner-qualifications"), quals.length
-    ? quals.map(function (q) { return el("li", { text: q }); })
-    : [el("li", null, [ph("diplômes et formations ici")])]);
+    ? [el("h3", { text: "Formation et qualifications" }), el("ul", { class: "check-list" }, quals.map(function (q) { return el("li", { text: q }); }))]
+    : SHOW_PH ? [el("h3", { text: "Formation et qualifications" }), el("ul", { class: "check-list" }, [el("li", null, [ph("diplômes et formations ici")])])] : []);
 
-  // ---------- 4. Le cabinet ----------
+  // ---------- 4. Cabinet ----------
   var photos = (S.cabinetPhotos || []).filter(function (p) { return p && filled(p.file); });
   if (photos.length) {
-    setChildren($("cabinet-gallery"), photos.map(function (p) {
-      return el("figure", null, [lazyImg(p.file, p.caption || "Le cabinet"), filled(p.caption) ? el("figcaption", { text: p.caption }) : null]);
+    setChildren($("cabinet-gallery"), photos.map(function (p, i) {
+      return el("figure", { class: "reveal" + (i === 0 ? " wide" : "") }, [lazyImg(p.file, p.caption || "Le cabinet"), filled(p.caption) ? el("figcaption", { text: p.caption }) : null]);
     }));
-  } else {
-    var n = S.cabinetPhotoSlots || 4, slots = [];
-    for (var i = 0; i < n; i++) slots.push(el("figure", null, [photoSlot("photo du cabinet à venir")]));
+  } else if (SHOW_PH) {
+    var slots = [];
+    for (var i = 0; i < (S.cabinetPhotoSlots || 4); i++) {
+      slots.push(el("figure", { class: "photo-slot" + (i === 0 ? " wide" : "") }, [el("span", { class: "slot-mark", html: mark }), ph("photo du cabinet à venir")]));
+    }
     setChildren($("cabinet-gallery"), slots);
+  } else {
+    var cab = $("cabinet"); if (cab) cab.remove();
+    qsa('[data-nav="cabinet"]').forEach(function (a) { a.remove(); });
   }
 
   // ---------- 5. Infos pratiques ----------
-  var hours = (S.hours || []).filter(function (h) { return h && filled(h.days); });
+  var DAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  var hours = (S.hours || []).filter(function (h) { return h && filled(h.label || h.days); });
+  function hoursText(h) {
+    if (h.closed) return "Fermé";
+    if (filled(h.open) && filled(h.close)) return h.open + " – " + h.close;
+    return h.time || "";
+  }
   setChildren($("hours-list"), hours.length
     ? hours.reduce(function (acc, h) {
-        acc.push(el("dt", { text: h.days }));
-        acc.push(el("dd", { class: /ferm/i.test(h.time || "") ? "closed" : "" }, [val(h.time, "horaires ici")]));
+        acc.push(el("dt", { text: h.label || h.days }));
+        acc.push(el("dd", { class: h.closed ? "closed" : "" }, [val(hoursText(h), "horaires ici")]));
         return acc;
       }, [])
     : [el("dt", null, [ph("jours ici")]), el("dd", null, [ph("horaires ici")])]);
 
-  setChildren($("address-block"), [
-    el("span", { class: "line" }, [val(S.address, "adresse exacte ici")]),
-    el("span", { class: "line" }, [val(S.neighborhood, "quartier ici"), document.createTextNode(S.city ? ", " + S.city : "")])
-  ]);
-  setChildren($("access-block"), filled(S.access) ? [el("h3", { text: "Accès et stationnement" }), el("p", { text: S.access })] : []);
+  // Badge "Ouvert maintenant" (heure de Casablanca)
+  (function () {
+    var badge = $("open-badge");
+    var sched = hours.filter(function (h) { return Array.isArray(h.days) && (h.closed || (filled(h.open) && filled(h.close))); });
+    if (!badge || !sched.length) return;
+    var now;
+    try {
+      var parts = new Intl.DateTimeFormat("en-GB", { timeZone: S.timeZone || "Africa/Casablanca", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+      var o = {}; parts.forEach(function (p) { o[p.type] = p.value; });
+      now = { day: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(o.weekday), min: (+o.hour) * 60 + (+o.minute) };
+    } catch (e) { var d = new Date(); now = { day: d.getDay(), min: d.getHours() * 60 + d.getMinutes() }; }
+    function toMin(t) { var a = String(t).split(":"); return (+a[0]) * 60 + (+a[1] || 0); }
+    function slotFor(day) { for (var k = 0; k < sched.length; k++) if (sched[k].days.indexOf(day) > -1 && !sched[k].closed) return sched[k]; return null; }
+    var today = slotFor(now.day);
+    if (today && now.min >= toMin(today.open) && now.min < toMin(today.close)) {
+      badge.textContent = "Ouvert · jusqu'à " + today.close;
+      badge.className = "open-badge is-open";
+    } else {
+      var label = "";
+      for (var k = 0; k < 8; k++) {
+        var day = (now.day + k) % 7, s = slotFor(day);
+        if (s && (k > 0 || now.min < toMin(s.open))) {
+          label = "Fermé · ouvre " + (k === 0 ? "à " : k === 1 ? "demain à " : DAYS[day] + " à ") + s.open;
+          break;
+        }
+      }
+      badge.textContent = label || "Fermé";
+      badge.className = "open-badge is-closed";
+    }
+    badge.hidden = false;
+  })();
 
-  var HV = S.homeVisits || {};
-  setChildren($("home-visits"), HV.offered === true
-    ? [document.createTextNode("Oui" + (filled(HV.area) ? " — " + HV.area + "." : ".") + " Précisez-le dans votre demande de rendez-vous.")]
-    : HV.offered === false ? [document.createTextNode("Les séances ont lieu uniquement au cabinet.")]
-    : [ph("visites à domicile : oui / non")]);
+  setChildren($("address-block"), [
+    el("span", { class: "line strong" }, [val(S.address, "adresse exacte ici")]),
+    el("span", { class: "line" }, [place ? document.createTextNode(place) : ph("quartier ici")])
+  ]);
+  setChildren($("access-block"), filled(S.access) ? [el("p", { class: "muted", text: S.access })] : []);
+  var dir = $("directions-link");
+  if (dir && filled(S.mapLink)) { dir.href = S.mapLink; dir.hidden = false; dir.appendChild(icon("arrow")); }
+
+  var hvCard = $("home-visits");
+  if (HV.offered === true) {
+    setChildren(hvCard, [document.createTextNode("Oui, " + (filled(HV.area) ? HV.area : "sur rendez-vous") + ". Précisez-le dans votre demande de rendez-vous.")]);
+  } else if (HV.offered === false) {
+    setChildren(hvCard, [document.createTextNode("Les séances ont lieu uniquement au cabinet.")]);
+  } else if (SHOW_PH) {
+    setChildren(hvCard, [ph("visites à domicile : oui / non")]);
+  } else if (hvCard) hvCard.closest(".info-card").remove();
 
   var mapBlock = $("map-block");
   if (filled(S.mapEmbedUrl)) {
-    setChildren(mapBlock, [
-      el("iframe", {
-        src: S.mapEmbedUrl, title: "Plan d'accès — " + siteName, loading: "lazy",
-        referrerpolicy: "no-referrer-when-downgrade", allowfullscreen: true
-      }),
-      filled(S.mapLink) ? el("a", { class: "map-link", href: S.mapLink, target: "_blank", rel: "noopener", text: "Ouvrir dans Google Maps" }) : null
-    ]);
-  } else {
-    setChildren(mapBlock, [photoSlot("carte Google Maps ici", "map-slot")]);
-  }
+    setChildren(mapBlock, [el("iframe", {
+      src: S.mapEmbedUrl, title: "Plan d'accès — " + siteName, loading: "lazy",
+      referrerpolicy: "no-referrer-when-downgrade", allowfullscreen: true
+    })]);
+  } else if (SHOW_PH) {
+    setChildren(mapBlock, [el("div", { class: "photo-slot map-slot" }, [ph("carte Google Maps ici")])]);
+  } else if (mapBlock) mapBlock.remove();
 
   // ---------- 6. Questions fréquentes ----------
-  var F = S.faq || {};
   var faqs = [
     { q: "Faut-il une ordonnance ?", a: F.prescription, label: "réponse ici" },
     { q: "Combien de temps dure une séance ?", a: F.sessionLength, label: "durée d'une séance ici" },
     { q: "Quelles assurances sont acceptées ?", a: F.insurance, label: "assurances acceptées ici" }
-  ].concat((F.extra || []).filter(function (x) { return x && filled(x.q); }));
-  setChildren($("faq-list"), faqs.map(function (f) {
-    return el("details", null, [el("summary", { text: f.q }), el("p", null, [val(f.a, f.label || "réponse ici")])]);
+  ].concat((F.extra || []).filter(function (x) { return x && filled(x.q); }))
+   .filter(function (f) { return filled(f.a) || SHOW_PH; });
+  setChildren($("faq-list"), faqs.map(function (f, idx) {
+    return el("details", idx === 0 ? { open: true } : null, [el("summary", { text: f.q }), el("div", { class: "faq-a" }, [el("p", null, [val(f.a, f.label || "réponse ici")])])]);
   }));
+  if (!faqs.length) { var fq = $("faq"); if (fq) fq.remove(); }
 
   // ---------- 7. Contact ----------
+  function contactItem(ic, label, value, href, ext) {
+    var body = [icon(ic), el("span", { class: "ci-text" }, [el("span", { class: "ci-label", text: label }), value])];
+    return el("li", null, [href ? el("a", { href: href, target: ext ? "_blank" : null, rel: ext ? "noopener" : null }, body) : el("div", null, body)]);
+  }
   var contacts = [];
-  contacts.push(el("li", null, [el("span", { class: "label", text: "Téléphone" }),
-    filled(S.phone) ? el("a", { href: "tel:" + String(S.phone).replace(/[^\d+]/g, ""), text: S.phone }) : ph("numéro de téléphone ici")]));
-  contacts.push(el("li", null, [el("span", { class: "label", text: "WhatsApp" }),
-    filled(S.whatsapp) ? el("a", { href: waLink(), target: "_blank", rel: "noopener", text: S.whatsappDisplay || "+" + String(S.whatsapp).replace(/\D/g, "") }) : ph("numéro WhatsApp ici")]));
+  if (phoneDigits) contacts.push(contactItem("phone", "Téléphone", el("strong", { text: S.phone }), "tel:" + phoneDigits));
+  else if (SHOW_PH) contacts.push(contactItem("phone", "Téléphone", ph("numéro de téléphone ici")));
+  if (waDigits) contacts.push(contactItem("wa", "WhatsApp", el("strong", { text: S.whatsappDisplay || "+" + waDigits }), waLink(), true));
+  else if (SHOW_PH) contacts.push(contactItem("wa", "WhatsApp", ph("numéro WhatsApp ici")));
   if (filled(S.instagram)) {
     var handle = String(S.instagram).replace(/\/+$/, "").split("/").pop();
-    contacts.push(el("li", null, [el("span", { class: "label", text: "Instagram" }),
-      el("a", { href: S.instagram, target: "_blank", rel: "noopener", text: "@" + handle })]));
-  }
-  if (filled(R.score)) {
-    contacts.push(el("li", null, [el("span", { class: "label", text: "Avis Google" }),
-      el("a", { href: R.url || "#", target: "_blank", rel: "noopener", text: R.score + "/5 — voir les avis" })]));
+    contacts.push(contactItem("instagram", "Instagram", el("strong", { text: "@" + handle }), S.instagram, true));
   }
   setChildren($("contact-list"), contacts);
 
-  var footerLinks = [];
-  if (filled(S.instagram)) footerLinks.push(el("a", { href: S.instagram, target: "_blank", rel: "noopener", text: "Instagram" }));
-  if (filled(R.url)) footerLinks.push(el("a", { href: R.url, target: "_blank", rel: "noopener", text: "Google Maps" }));
-  var fl = $("footer-links");
-  if (fl) { fl.textContent = ""; footerLinks.forEach(function (a, i) { if (i) fl.appendChild(document.createTextNode(" · ")); fl.appendChild(a); }); }
+  // Pied de page
+  setChildren($("footer-address"), [
+    el("p", { class: "footer-title", text: "Adresse" }),
+    el("p", null, [val(S.address, "adresse ici")]),
+    place ? el("p", { text: place }) : null,
+    hours.length ? el("p", { class: "muted", text: hours.map(function (h) { return (h.label || h.days) + " : " + hoursText(h); }).join(" · ") }) : null
+  ]);
+  var links = [];
+  if (phoneDigits) links.push(el("a", { href: "tel:" + phoneDigits, text: S.phone }));
+  if (waDigits) links.push(el("a", { href: waLink(), target: "_blank", rel: "noopener", text: "WhatsApp" }));
+  if (filled(S.instagram)) links.push(el("a", { href: S.instagram, target: "_blank", rel: "noopener", text: "Instagram" }));
+  if (filled(R.url)) links.push(el("a", { href: R.url, target: "_blank", rel: "noopener", text: "Avis Google" }));
+  setChildren($("footer-links"), [el("p", { class: "footer-title", text: "Contact" })].concat(links.map(function (a) { return el("p", null, [a]); })));
+  setChildren($("footer-copy"), [document.createTextNode("© " + new Date().getFullYear() + " " + siteName + (place ? " · " + place : ""))]);
 
-  // Bouton WhatsApp fixe
+  // Barre d'action fixe
   var fab = $("whatsapp-fab");
   if (fab) fab.href = waLink();
+  var barCall = $("bar-call");
+  if (barCall) { if (phoneDigits) barCall.href = "tel:" + phoneDigits; else barCall.remove(); }
 
-  // Formulaire → message WhatsApp pré-rempli
+  // ---------- Formulaire → WhatsApp ----------
   var OTHER = "Autre / je ne sais pas";
   var select = $("f-specialty");
   if (select) {
@@ -283,47 +405,44 @@
     if (hint) hint.textContent = select && select.value === OTHER ? "(obligatoire)" : "(facultatif)";
   }
 
-  // Les boutons "Prendre rendez-vous" des cartes pré-sélectionnent la spécialité
-  Array.prototype.forEach.call(document.querySelectorAll("[data-specialty]"), function (a) {
+  qsa("[data-specialty]").forEach(function (a) {
     a.addEventListener("click", function () {
       if (select) { select.value = a.getAttribute("data-specialty"); updateHint(); }
     });
   });
 
   var form = $("rdv-form");
-  if (form) {
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      var name = form.elements.name.value.trim();
-      var phone = form.elements.phone.value.trim();
-      var spec = form.elements.specialty.value;
-      var msg = form.elements.message.value.trim();
-      var home = form.elements.home && form.elements.home.checked && !homeWrap.hidden;
-      var err = $("form-error");
-      var missing = [];
-      if (!name) missing.push("votre nom");
-      if (!phone) missing.push("votre téléphone");
-      if (!spec) missing.push("le motif de consultation");
-      if (spec === OTHER && !msg) missing.push("une description de votre problème");
-      if (missing.length) {
-        err.textContent = "Merci d'indiquer " + missing.join(", ") + ".";
-        err.hidden = false;
-        return;
-      }
-      err.hidden = true;
-      var lines = [
-        (S.whatsappMessage || "Bonjour, je souhaite prendre rendez-vous."),
-        "",
-        "Nom : " + name,
-        "Téléphone : " + phone,
-        "Motif : " + spec
-      ];
-      if (msg) lines.push("Description : " + msg);
-      if (home) lines.push("Séance à domicile souhaitée : oui");
-      var a = el("a", { href: waLink(lines.join("\n")), target: "_blank", rel: "noopener" });
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    });
-  }
+  if (form) form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = form.elements.name.value.trim();
+    var phone = form.elements.phone.value.trim();
+    var spec = form.elements.specialty.value;
+    var msg = form.elements.message.value.trim();
+    var home = !!(form.elements.home && form.elements.home.checked && homeWrap && !homeWrap.hidden);
+    var err = $("form-error");
+    var missing = [];
+    if (!name) missing.push("votre nom");
+    if (!phone) missing.push("votre téléphone");
+    if (!spec) missing.push("le motif de consultation");
+    if (spec === OTHER && !msg) missing.push("une description de votre problème");
+    if (missing.length) { err.textContent = "Merci d'indiquer " + missing.join(", ") + "."; err.hidden = false; return; }
+    err.hidden = true;
+    var lines = [S.whatsappMessage || "Bonjour, je souhaite prendre rendez-vous.", "", "Nom : " + name, "Téléphone : " + phone, "Motif : " + spec];
+    if (msg) lines.push("Description : " + msg);
+    if (home) lines.push("Séance à domicile souhaitée : oui");
+    var a = el("a", { href: waLink(lines.join("\n")), target: "_blank", rel: "noopener" });
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  // Alternance des fonds (après suppression éventuelle de sections)
+  qsa("main > .section:not(.contact-section)").forEach(function (sec, idx) { sec.classList.toggle("section-tint", idx % 2 === 1); });
+
+  // ---------- Apparition au défilement ----------
+  var reveals = qsa(".reveal");
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    reveals.forEach(function (n) { io.observe(n); });
+  } else reveals.forEach(function (n) { n.classList.add("in"); });
 })();
